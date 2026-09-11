@@ -1,0 +1,3 @@
+# 本项目面向 Linux 构建，源码与脚本统一使用 LF；
+# 否则在 Windows 下 checkout 会把 .sh 转成 CRLF，导致 WSL 中执行失败。
+* text=auto eol=lf
