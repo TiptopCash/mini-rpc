@@ -23,7 +23,8 @@ constexpr uint32_t kRpcMaxBodyLen = 64u * 1024 * 1024;
 enum RpcMessageType : uint8_t {
   kRpcRequest = 1,
   kRpcResponse = 2,
-  kRpcHeartbeat = 3,
+  kRpcHeartbeat = 3,     // ping：要求对方回 ack
+  kRpcHeartbeatAck = 4,  // pong：对 ping 的响应，收到后不再回复（避免无限互回）
 };
 
 // ---- 网络字节序（大端）读写 ----

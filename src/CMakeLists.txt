@@ -17,6 +17,7 @@ add_library(mrpc_net STATIC
   net/Acceptor.cc
   net/TcpConnection.cc
   net/TcpServer.cc
+  net/PeriodicTimer.cc
 )
 target_include_directories(mrpc_net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mrpc_net PUBLIC Threads::Threads)
@@ -25,6 +26,7 @@ target_link_libraries(mrpc_net PUBLIC Threads::Threads)
 add_library(mrpc_proto STATIC
   ${PROTO_SRCS}
   protocol/RpcCodec.cc
+  protocol/HeartbeatMonitor.cc
 )
 target_include_directories(mrpc_proto PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -50,6 +52,9 @@ target_link_libraries(proto_echo_server PRIVATE mrpc_proto)
 
 add_executable(proto_echo_client main/proto_echo_client.cc)
 target_link_libraries(proto_echo_client PRIVATE mrpc_proto)
+
+add_executable(idle_client main/idle_client.cc)
+target_link_libraries(idle_client PRIVATE mrpc_proto)
 
 # ---- 测试 ----
 add_executable(codec_test test/codec_test.cc)

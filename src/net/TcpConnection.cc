@@ -7,6 +7,7 @@
 #include <errno.h>
 
 #include "common/Logger.h"
+#include "common/Timestamp.h"
 #include "net/Channel.h"
 #include "net/EventLoop.h"
 #include "net/Socket.h"
@@ -19,6 +20,7 @@ TcpConnection::TcpConnection(EventLoop* loop, const std::string& nameArg,
     : loop_(loop),
       name_(nameArg),
       state_(kConnecting),
+      lastReceiveTimeUs_(nowMicros()),
       socket_(new Socket(sockfd)),
       channel_(new Channel(loop, sockfd)),
       localAddr_(localAddr),
@@ -87,6 +89,21 @@ void TcpConnection::shutdownInLoop() {
   }
 }
 
+void TcpConnection::forceClose() {
+  if (state_.load() == kConnected || state_.load() == kDisconnecting) {
+    auto self = shared_from_this();
+    loop_->queueInLoop([self] { self->forceCloseInLoop(); });
+  }
+}
+
+void TcpConnection::forceCloseInLoop() {
+  loop_->assertInLoopThread();
+  if (state_.load() == kConnected || state_.load() == kDisconnecting) {
+    // 直接走关闭流程：置为已断开、触发回调，由 TcpServer 摘除并延迟销毁
+    handleClose();
+  }
+}
+
 void TcpConnection::connectEstablished() {
   loop_->assertInLoopThread();
   setState(kConnected);
@@ -113,6 +130,7 @@ void TcpConnection::handleRead() {
   int savedErrno = 0;
   ssize_t n = inputBuffer_.readFd(channel_->fd(), &savedErrno);
   if (n > 0) {
+    lastReceiveTimeUs_.store(nowMicros(), std::memory_order_relaxed);
     if (messageCallback_) {
       messageCallback_(shared_from_this(), &inputBuffer_);
     }

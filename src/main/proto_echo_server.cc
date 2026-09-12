@@ -1,5 +1,9 @@
-// 协议层 echo 服务端：按固定头分帧，解析 protobuf，原样回包
+// 协议层 echo 服务端：按固定头分帧、解析 protobuf、原样回包，并带应用层心跳。
+//
+// 用法: ./proto_echo_server [port] [threads] [heartbeatSec] [timeoutSec]
+//   heartbeatSec <= 0 表示关闭心跳
 #include <cstdlib>
+#include <memory>
 
 #include "common/Logger.h"
 #include "net/Buffer.h"
@@ -7,6 +11,7 @@
 #include "net/InetAddress.h"
 #include "net/TcpConnection.h"
 #include "net/TcpServer.h"
+#include "protocol/HeartbeatMonitor.h"
 #include "protocol/RpcCodec.h"
 #include "rpc.pb.h"
 
@@ -15,6 +20,8 @@ using namespace mrpc;
 int main(int argc, char* argv[]) {
   uint16_t port = argc > 1 ? static_cast<uint16_t>(::atoi(argv[1])) : 9200;
   int threads = argc > 2 ? ::atoi(argv[2]) : 4;
+  int heartbeatSec = argc > 3 ? ::atoi(argv[3]) : 10;
+  int timeoutSec = argc > 4 ? ::atoi(argv[4]) : 30;
 
   EventLoop loop;
   InetAddress listenAddr(port);
@@ -43,9 +50,21 @@ int main(int argc, char* argv[]) {
         conn->shutdown();
         return;
       }
+
       if (type == kRpcHeartbeat) {
-        continue;  // 心跳无需回包
+        // 收到 ping，回 ack。对端收到 ack 不再回复，避免双方无限互回
+        Buffer out;
+        RpcMessage ack;
+        ack.set_seq(msg.seq());
+        RpcCodec::encode(ack, kRpcHeartbeatAck, &out);
+        conn->send(out.retrieveAllAsString());
+        continue;
       }
+      if (type == kRpcHeartbeatAck) {
+        // 对端对我方 ping 的响应；lastReceiveTime 已由网络层自动更新
+        continue;
+      }
+
       LOG_INFO << "ProtoEchoServer - seq=" << msg.seq()
                << " service=" << msg.service_name()
                << " method=" << msg.method_name()
@@ -57,7 +76,20 @@ int main(int argc, char* argv[]) {
     }
   });
 
+  // 心跳放在协议层：需要编码 RPC 帧，网络层不依赖 protobuf
+  std::unique_ptr<HeartbeatMonitor> heartbeat;
+  if (heartbeatSec > 0) {
+    heartbeat.reset(new HeartbeatMonitor(
+        &loop, &server, HeartbeatOptions{1, heartbeatSec, timeoutSec}));
+  }
+
   server.start();
+  if (heartbeat) {
+    heartbeat->start();
+  } else {
+    LOG_INFO << "ProtoEchoServer - heartbeat disabled";
+  }
+
   LOG_INFO << "ProtoEchoServer listening on port " << port << " with " << threads
            << " IO threads";
   loop.loop();

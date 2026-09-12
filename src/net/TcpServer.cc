@@ -89,6 +89,14 @@ void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr) {
   ioLoop->runInLoop([conn] { conn->connectEstablished(); });
 }
 
+void TcpServer::forEachConnection(
+    const std::function<void(const TcpConnectionPtr&)>& cb) {
+  loop_->assertInLoopThread();
+  for (const auto& item : connections_) {
+    cb(item.second);
+  }
+}
+
 void TcpServer::removeConnection(const TcpConnectionPtr& conn) {
   loop_->runInLoop([this, conn] { removeConnectionInLoop(conn); });
 }

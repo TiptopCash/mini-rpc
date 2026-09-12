@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <functional>
 #include <memory>
 #include <string>
 #include <unordered_map>
@@ -39,6 +40,11 @@ class TcpServer : public Noncopyable {
   }
 
   EventLoop* getLoop() const { return loop_; }
+
+  // 遍历当前所有连接（心跳扫描等定时任务用）。
+  // 必须在 baseLoop 线程调用：connections_ 无锁保护。
+  void forEachConnection(
+      const std::function<void(const TcpConnectionPtr&)>& cb);
 
  private:
   void newConnection(int sockfd, const InetAddress& peerAddr);

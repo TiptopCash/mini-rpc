@@ -1,6 +1,7 @@
 #pragma once
 
 #include <atomic>
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <string>
@@ -37,8 +38,17 @@ class TcpConnection : public Noncopyable,
   const InetAddress& peerAddress() const { return peerAddr_; }
   bool connected() const { return state_.load() == kConnected; }
 
+  // 最近一次「收到数据」的时刻（单调微秒）。
+  // 刻意只统计接收方向：若把本端发送也算作活动，
+  // 服务端自己发的探测包会不断重置计时器，死连接将永远无法超时。
+  int64_t lastReceiveTimeUs() const {
+    return lastReceiveTimeUs_.load(std::memory_order_relaxed);
+  }
+
   void send(const std::string& message);
   void shutdown();
+  // 立即关闭（不等待对端 FIN），用于空闲超时等场景
+  void forceClose();
 
   void setConnectionCallback(ConnectionCallback cb) {
     connectionCallback_ = std::move(cb);
@@ -64,10 +74,12 @@ class TcpConnection : public Noncopyable,
   void handleError();
   void sendInLoop(const std::string& message);
   void shutdownInLoop();
+  void forceCloseInLoop();
 
   EventLoop* loop_;
   const std::string name_;
   std::atomic<StateE> state_;
+  std::atomic<int64_t> lastReceiveTimeUs_;
   std::unique_ptr<Socket> socket_;
   std::unique_ptr<Channel> channel_;
   const InetAddress localAddr_;

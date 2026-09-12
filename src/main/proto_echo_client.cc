@@ -135,6 +135,19 @@ int main(int argc, char* argv[]) {
         ::close(fd);
         return 1;
       }
+      // 心跳帧不计入响应统计；收到 ping 需回 ack
+      if (type == kRpcHeartbeat) {
+        Buffer ackBuf;
+        RpcMessage ack;
+        ack.set_seq(msg.seq());
+        RpcCodec::encode(ack, kRpcHeartbeatAck, &ackBuf);
+        const std::string ackWire = ackBuf.retrieveAllAsString();
+        writeAll(fd, ackWire.data(), ackWire.size());
+        continue;
+      }
+      if (type == kRpcHeartbeatAck) {
+        continue;
+      }
       seqs.push_back(msg.seq());
       payloads.push_back(msg.payload());
       if (static_cast<int>(seqs.size()) == count) break;
