@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package mrpc;
+
+// RPC 帧的业务负载。
+// 固定头只负责分帧，所有逻辑字段（含 seq）统一在这里定义，避免两处重复。
+message RpcMessage {
+  uint64 seq = 1;           // 请求序号，用于匹配响应（支持异步乱序返回）
+  string service_name = 2;  // 服务名
+  string method_name = 3;   // 方法名
+  bytes payload = 4;        // 请求/响应的序列化业务数据
+  int32 error_code = 5;     // 0 表示成功
+  string error_msg = 6;
+}
+
+// ---- 端到端验证用的示例消息 ----
+
+message EchoRequest {
+  string text = 1;
+}
+
+message EchoResponse {
+  string text = 1;
+}

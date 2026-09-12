@@ -12,4 +12,6 @@ endif()
 
 add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 
+enable_testing()
+
 add_subdirectory(src)
