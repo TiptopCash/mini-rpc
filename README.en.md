@@ -522,11 +522,11 @@ window** instead of once per call, so the denser the calls, the wider the gap.
 - **At 64 KB, P50 ≈ P90 ≈ 60 µs**: latency is bandwidth-bound rather than CPU-bound, so the shape
   of the curve changes as expected.
 - **Run-to-run variance is large, so quote a range**: with the same code and the same
-  configuration, "8 threads / 64 B" measured **195k** (the numbers above) and **248k** (an earlier
-  recording) at different times — roughly a 26% spread; "16 threads / 64 B" gave **269k** and
-  **312k**. In a same-machine loopback benchmark the client and server share and contend for CPU,
-  so variance of this magnitude is expected. Quote the order of magnitude, never a single peak
-  as if it were a guarantee.
+  configuration, three runs of "8 threads / 64 B" gave **195k** (the numbers above), **220k**
+  (a rerun) and **248k** (an earlier recording) — a ~27% spread between highest and lowest;
+  "16 threads / 64 B" gave **269k** / **276k** / **312k**. In a same-machine loopback benchmark
+  the client and server share and contend for CPU, so variance of this magnitude is expected.
+  Quote the order of magnitude, never a single peak as if it were a guarantee.
 
 > ⚠️ Always quote the test setup (loopback / same machine / I/O thread count / message size)
 > **and the observed range** alongside the numbers, otherwise they are not comparable.
