@@ -1,5 +1,7 @@
 # mini-rpc
 
+[English](README.en.md) | 中文
+
 [![CI](https://github.com/TiptopCash/mini-rpc/actions/workflows/ci.yml/badge.svg)](https://github.com/TiptopCash/mini-rpc/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -9,6 +11,9 @@
 目标是把「一次 RPC 调用从生成代码到对端执行」的完整链路打通，
 并在过程中用**实测数据**验证每一条关键路径（部分写、心跳超时、超时兜底、故障转移等），
 而不是「写完就算通过」。
+
+实践记录：[手写 C++ RPC 框架：7 个只有实测才能发现的坑](docs/pitfalls.md)
+——把上面这些验证过程中撞到的坑逐个写开（现象 / 原因 / 修法 / 实测数据）。
 
 ---
 
@@ -62,7 +67,110 @@
 
 ## 三、已实现模块
 
-### 网络层 `mrpc_net`
+### 3.1 整体架构
+
+**分层依赖**：`main` → `protocol` → `net` → `common`，单向不反向。
+`net` 不依赖 protobuf（可独立复用），所以需要编码 RPC 帧的逻辑（心跳、请求超时）放在 `protocol`。
+
+```mermaid
+graph TB
+    subgraph L1["main — 示例与工具"]
+        A1["rpc_server"]
+        A2["rpc_stub_client"]
+        A3["rpc_pool_client"]
+        A4["bench_client"]
+    end
+    subgraph L2["protocol — 协议层 mrpc_proto"]
+        B1["RpcChannel"]
+        B2["RpcServer"]
+        B3["RpcCodec"]
+        B4["ServiceRegistry"]
+        B5["HeartbeatMonitor"]
+        B6["LoadBalancer"]
+        B7["ConnectionPool"]
+    end
+    subgraph L3["net — 网络层 mrpc_net 不依赖 protobuf"]
+        C1["EventLoop / Epoller / Channel"]
+        C2["Acceptor / Connector"]
+        C3["TcpServer / TcpClient / TcpConnection"]
+        C4["Buffer / Socket / InetAddress"]
+        C5["TimerQueue / PeriodicTimer / SignalWatcher"]
+    end
+    subgraph L4["common"]
+        D1["Logging / Timestamp / Noncopyable"]
+    end
+    L1 --> L2 --> L3 --> L4
+```
+
+**主从 Reactor**：主线程只负责 `accept`，新连接 round-robin 交给 IO 线程；
+每个 IO 线程一个 `EventLoop`（one loop per thread），线程间不共享连接状态。
+
+```mermaid
+graph TB
+    subgraph MAIN["主线程 — Main Reactor"]
+        M1["EventLoop 主循环"]
+        M2["Acceptor 只负责 accept"]
+        M3["SignalWatcher / signalfd"]
+    end
+    M2 -->|"新连接 round-robin 分发"| POOL["EventLoopThreadPool"]
+    POOL --> T1["IO 线程 1 — EventLoop"]
+    POOL --> T2["IO 线程 2 — EventLoop"]
+    POOL --> T3["IO 线程 N — EventLoop"]
+    T1 --> E1["TcpConnection 1..n"]
+    T2 --> E2["TcpConnection ..."]
+    T3 --> E3["TcpConnection ..."]
+    E1 --> RPC["RpcServer 分帧 + protobuf 反射分发"]
+    E2 --> RPC
+    E3 --> RPC
+    M3 --> M1
+```
+
+**一次 RPC 调用的完整路径**（从生成代码到对端执行，再原路返回）：
+
+```mermaid
+sequenceDiagram
+    participant App as 业务代码
+    participant Stub as EchoService::Stub
+    participant Ch as RpcChannel
+    participant TC as TcpClient
+    participant Srv as RpcServer
+    participant Reg as ServiceRegistry
+
+    App->>Stub: stub.Echo(controller, request, response, done)
+    Stub->>Ch: CallMethod(方法描述符, ...)
+    Ch->>Ch: 分配 seq + 登记 pending
+    Ch->>TC: send(编码后的 RpcMessage)
+    TC->>Srv: TCP 字节流
+    Srv->>Srv: RpcCodec 分帧
+    Srv->>Reg: findMethod(服务名, 方法名)
+    Reg-->>Srv: Service* + MethodDescriptor*
+    Srv->>Srv: 反射 New() + ParseFromString
+    Srv->>Srv: CallMethod 分发到业务实现
+    Srv-->>TC: 回包 — 带回同一个 seq
+    TC-->>Ch: 可读事件 -> 解帧
+    Ch->>Ch: 按 seq 匹配 pending
+    Ch-->>App: done->Run() / 唤醒条件变量
+```
+
+**连接池与负载均衡**：池自持一个 `EventLoopThread`；每个节点一条连接
+（协议按 seq 多路复用，单连接已支持大量在途请求）。
+
+```mermaid
+graph LR
+    Caller["业务线程"] --> CP["ConnectionPool"]
+    CP --> LB["LoadBalancer 策略"]
+    LB --> RR["轮询 — 原子自增"]
+    LB --> CH["一致性哈希 — FNV-1a + 100 虚拟节点"]
+    RR --> Pick["选出候选节点并前移"]
+    CH --> Pick
+    Pick --> NA["Node A<br/>RpcChannel + TcpClient"]
+    Pick --> NB["Node B<br/>RpcChannel + TcpClient"]
+    NA --> SA["rpc_server A"]
+    NB --> SB["rpc_server B"]
+    NB -->|"连不上 → 冷却 1s 后跳过"| Cool["downUntilMs"]
+```
+
+### 3.2 网络层 `mrpc_net`
 
 | 模块 | 文件 | 实现要点 |
 |---|---|---|
@@ -81,7 +189,7 @@
 | 定时器集合 | `TimerQueue` | **一个 loop 一个 timerfd + 最小堆**，承载大量短生命周期定时器；懒删除 + `active_` 表 O(1) 取消；重复定时器按原到期时间递推**无漂移** |
 | 信号 | `SignalWatcher` | signalfd 把 SIGINT/SIGTERM 变成普通 epoll 事件；`sigprocmask` 必须早于 IO 线程创建 |
 
-### 协议层 `mrpc_proto`
+### 3.3 协议层 `mrpc_proto`
 
 | 模块 | 文件 | 实现要点 |
 |---|---|---|
@@ -96,7 +204,7 @@
 | 负载均衡 | `LoadBalancer` | 轮询（原子自增）/ 一致性哈希（FNV-1a + 100 虚拟节点，节点列表变化才重建环） |
 | 连接池 | `ConnectionPool` | 自持 `EventLoopThread`；一个节点一条连接；策略选中节点后顺序失败转移，连不上的节点进入**冷却** |
 
-### 示例与工具
+### 3.4 示例与工具
 
 | 程序 | 用途 |
 |---|---|
