@@ -22,11 +22,14 @@ add_library(mrpc_net STATIC
 target_include_directories(mrpc_net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mrpc_net PUBLIC Threads::Threads)
 
-# ---- 协议层（固定头分帧 + protobuf 序列化）----
+# ---- 协议层（固定头分帧 + protobuf 序列化 + 反射分发）----
 add_library(mrpc_proto STATIC
   ${PROTO_SRCS}
   protocol/RpcCodec.cc
   protocol/HeartbeatMonitor.cc
+  protocol/RpcController.cc
+  protocol/ServiceRegistry.cc
+  protocol/RpcServer.cc
 )
 target_include_directories(mrpc_proto PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -55,6 +58,13 @@ target_link_libraries(proto_echo_client PRIVATE mrpc_proto)
 
 add_executable(idle_client main/idle_client.cc)
 target_link_libraries(idle_client PRIVATE mrpc_proto)
+
+# ---- RPC 服务端 / 客户端（反射分发示例）----
+add_executable(rpc_server main/rpc_server.cc)
+target_link_libraries(rpc_server PRIVATE mrpc_proto)
+
+add_executable(rpc_client main/rpc_client.cc)
+target_link_libraries(rpc_client PRIVATE mrpc_proto)
 
 # ---- 测试 ----
 add_executable(codec_test test/codec_test.cc)

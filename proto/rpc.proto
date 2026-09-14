@@ -2,6 +2,10 @@ syntax = "proto3";
 
 package mrpc;
 
+// proto3 默认不生成 C++ service 抽象类（那是 gRPC 插件的事），
+// 这里需要 protobuf 自带的反射分发代码，必须显式打开。
+option cc_generic_services = true;
+
 // RPC 帧的业务负载。
 // 固定头只负责分帧，所有逻辑字段（含 seq）统一在这里定义，避免两处重复。
 message RpcMessage {
@@ -21,4 +25,12 @@ message EchoRequest {
 
 message EchoResponse {
   string text = 1;
+}
+
+// ---- 示例服务 ----
+// 声明 service 后，protoc 会生成抽象类 mrpc::EchoService，自带
+// GetDescriptor() / CallMethod() / GetRequestPrototype()，
+// 服务端据此在「不知道具体消息类型」的情况下完成通用分发。
+service EchoService {
+  rpc Echo(EchoRequest) returns (EchoResponse);
 }
