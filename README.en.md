@@ -256,8 +256,8 @@ Everything below is measured locally over WSL2 loopback; the scripts under
 
 | Scenario | Result |
 |---|---|
-| 200 concurrent connections × 200 messages | 0 failures, 0.18 s |
-| 64 KB × 2,000 messages | 20,875 / 21,661 QPS (two runs), server stayed up |
+| 200 concurrent connections × 200 messages | 0 failures, 0.16–0.18 s |
+| 64 KB × 2,000 messages | ≈ 21k–23k QPS (three runs: 20,875 / 21,661 / 22,973), server stayed up |
 | 30 abrupt disconnects (`kill -9`) | all connections reclaimed correctly, no crash |
 
 ### 5.3 EPOLLOUT partial-write path
