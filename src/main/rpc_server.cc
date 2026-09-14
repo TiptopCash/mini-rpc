@@ -1,7 +1,8 @@
 // RPC 服务端示例：注册 EchoServiceImpl，请求经 protobuf 反射分发到具体方法。
 //
-// 用法: ./rpc_server [port] [threads] [heartbeatSec] [timeoutSec] [requestTimeoutMs]
+// 用法: ./rpc_server [port] [threads] [heartbeatSec] [timeoutSec] [requestTimeoutMs] [nodeTag]
 //   heartbeatSec <= 0 关闭心跳；requestTimeoutMs <= 0 关闭请求级超时兜底
+//   nodeTag 非空时响应变成 "echo:<text>@<tag>"，用来在连接池演示里分辨是哪个节点
 #include <csignal>
 #include <cstdlib>
 #include <string>
@@ -18,6 +19,8 @@ using namespace mrpc;
 // 业务实现只需继承 protoc 生成的抽象类，完全不碰网络 / 分帧 / 编解码。
 class EchoServiceImpl : public EchoService {
  public:
+  explicit EchoServiceImpl(std::string tag) : tag_(std::move(tag)) {}
+
   void Echo(google::protobuf::RpcController* controller,
             const EchoRequest* request, EchoResponse* response,
             google::protobuf::Closure* done) override {
@@ -27,7 +30,8 @@ class EchoServiceImpl : public EchoService {
       done->Run();
       return;
     }
-    response->set_text("echo:" + request->text());
+    response->set_text("echo:" + request->text() +
+                       (tag_.empty() ? "" : "@" + tag_));
     done->Run();
   }
 
@@ -37,6 +41,9 @@ class EchoServiceImpl : public EchoService {
   void NoReply(google::protobuf::RpcController* /*controller*/,
                const EchoRequest* /*request*/, EchoResponse* /*response*/,
                google::protobuf::Closure* /*done*/) override {}
+
+ private:
+  const std::string tag_;
 };
 
 int main(int argc, char* argv[]) {
@@ -45,13 +52,14 @@ int main(int argc, char* argv[]) {
   int heartbeatSec = argc > 3 ? ::atoi(argv[3]) : 10;
   int timeoutSec = argc > 4 ? ::atoi(argv[4]) : 30;
   int64_t requestTimeoutMs = argc > 5 ? ::atoll(argv[5]) : 5000;
+  const std::string nodeTag = argc > 6 ? argv[6] : "";
 
   EventLoop loop;
   InetAddress listenAddr(port);
 
   // 先于 server 声明 -> 后于 server 销毁。
   // 注册表不持有所有权，若先销毁服务对象，server 析构期间就会持有悬垂指针
-  EchoServiceImpl echoService;
+  EchoServiceImpl echoService(nodeTag);
   RpcServer server(&loop, listenAddr, "RpcServer", threads);
   server.registerService(&echoService);
   server.setHeartbeat(heartbeatSec, timeoutSec);

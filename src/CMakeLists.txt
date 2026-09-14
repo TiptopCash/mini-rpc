@@ -35,6 +35,8 @@ add_library(mrpc_proto STATIC
   protocol/ServiceRegistry.cc
   protocol/RpcServer.cc
   protocol/RpcChannel.cc
+  protocol/LoadBalancer.cc
+  protocol/ConnectionPool.cc
 )
 target_include_directories(mrpc_proto PUBLIC
   ${CMAKE_CURRENT_SOURCE_DIR}
@@ -73,6 +75,9 @@ target_link_libraries(rpc_client PRIVATE mrpc_proto)
 
 add_executable(rpc_stub_client main/rpc_stub_client.cc)
 target_link_libraries(rpc_stub_client PRIVATE mrpc_proto)
+
+add_executable(rpc_pool_client main/rpc_pool_client.cc)
+target_link_libraries(rpc_pool_client PRIVATE mrpc_proto)
 
 # ---- 测试 ----
 add_executable(codec_test test/codec_test.cc)
