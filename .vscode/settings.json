@@ -1,0 +1,8 @@
+{
+  // clangd 默认只在源文件所在目录向上找 compile_commands.json，
+  // 本项目的构建目录是 build/，所以显式指过去。
+  // 需先执行一次 cmake 配置（CMakeLists.txt 里已开启 CMAKE_EXPORT_COMPILE_COMMANDS）。
+  "clangd.arguments": [
+    "--compile-commands-dir=${workspaceFolder}/build"
+  ]
+}

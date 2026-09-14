@@ -10,7 +10,9 @@ cmake_install.cmake
 compile_commands.json
 
 # 编辑器
-.vscode/
+# 忽略 .vscode/ 下的本机文件，但保留共享的编辑器配置（clangd 等）
+.vscode/*
+!.vscode/settings.json
 .idea/
 *.swp
 
