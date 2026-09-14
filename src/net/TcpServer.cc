@@ -14,21 +14,6 @@
 
 namespace mrpc {
 
-namespace {
-
-InetAddress getLocalAddr(int sockfd) {
-  struct sockaddr_in localaddr;
-  memset(&localaddr, 0, sizeof(localaddr));
-  socklen_t addrlen = sizeof(localaddr);
-  if (::getsockname(sockfd, reinterpret_cast<struct sockaddr*>(&localaddr),
-                    &addrlen) < 0) {
-    LOG_ERROR << "getsockname failed: " << strerror(errno);
-  }
-  return InetAddress(localaddr);
-}
-
-}  // namespace
-
 TcpServer::TcpServer(EventLoop* loop, const InetAddress& listenAddr,
                      const std::string& nameArg, Option option)
     : loop_(loop),
@@ -76,7 +61,7 @@ void TcpServer::newConnection(int sockfd, const InetAddress& peerAddr) {
   LOG_INFO << "TcpServer::newConnection [" << name_ << "] - new connection ["
            << connName << "] from " << peerAddr.toIpPort();
 
-  InetAddress localAddr(getLocalAddr(sockfd));
+  InetAddress localAddr(localAddressOf(sockfd));
   TcpConnectionPtr conn =
       std::make_shared<TcpConnection>(ioLoop, connName, sockfd, localAddr,
                                       peerAddr);

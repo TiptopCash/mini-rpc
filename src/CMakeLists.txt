@@ -15,8 +15,10 @@ add_library(mrpc_net STATIC
   net/EventLoopThread.cc
   net/EventLoopThreadPool.cc
   net/Acceptor.cc
+  net/Connector.cc
   net/TcpConnection.cc
   net/TcpServer.cc
+  net/TcpClient.cc
   net/PeriodicTimer.cc
   net/TimerQueue.cc
   net/SignalWatcher.cc
@@ -76,3 +78,7 @@ add_test(NAME codec_test COMMAND codec_test)
 add_executable(timer_queue_test test/timer_queue_test.cc)
 target_link_libraries(timer_queue_test PRIVATE mrpc_net)
 add_test(NAME timer_queue_test COMMAND timer_queue_test)
+
+add_executable(tcp_client_test test/tcp_client_test.cc)
+target_link_libraries(tcp_client_test PRIVATE mrpc_net)
+add_test(NAME tcp_client_test COMMAND tcp_client_test)

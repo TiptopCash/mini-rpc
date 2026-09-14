@@ -24,4 +24,7 @@ class InetAddress {
   struct sockaddr_in addr_;
 };
 
+// 由已连接的 fd 反查本端地址（getsockname），失败返回全零地址
+InetAddress localAddressOf(int sockfd);
+
 }  // namespace mrpc

@@ -30,6 +30,11 @@ class EventLoop : public Noncopyable {
   void runInLoop(Functor cb);
   void queueInLoop(Functor cb);
 
+  // 投递到 loop 线程执行并等待其完成。用于析构这类「必须做完才能继续」的清理：
+  // runInLoop 是异步的，清理任务可能排在 loop 退出之后永远不被执行。
+  // 要求 loop 已在运行（否则没人来执行，会一直等下去）。
+  void runInLoopAndWait(Functor cb);
+
   bool isInLoopThread() const;
   void assertInLoopThread();
   void wakeup();

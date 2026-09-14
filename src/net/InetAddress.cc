@@ -1,6 +1,7 @@
 #include "net/InetAddress.h"
 
 #include <arpa/inet.h>
+#include <sys/socket.h>
 
 #include <cstring>
 
@@ -36,5 +37,15 @@ std::string InetAddress::toIpPort() const {
 }
 
 uint16_t InetAddress::port() const { return ntohs(addr_.sin_port); }
+
+InetAddress localAddressOf(int sockfd) {
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  socklen_t len = sizeof(addr);
+  if (::getsockname(sockfd, reinterpret_cast<struct sockaddr*>(&addr), &len) < 0) {
+    memset(&addr, 0, sizeof(addr));
+  }
+  return InetAddress(addr);
+}
 
 }  // namespace mrpc

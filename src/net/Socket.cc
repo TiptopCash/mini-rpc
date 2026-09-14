@@ -22,7 +22,26 @@ int createNonblocking() {
   return sockfd;
 }
 
-Socket::~Socket() { ::close(sockfd_); }
+int getSocketError(int sockfd) {
+  int optval = 0;
+  socklen_t optlen = sizeof(optval);
+  if (::getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &optval, &optlen) < 0) {
+    return errno;
+  }
+  return optval;
+}
+
+Socket::~Socket() {
+  if (sockfd_ >= 0) {
+    ::close(sockfd_);
+  }
+}
+
+int Socket::release() {
+  const int fd = sockfd_;
+  sockfd_ = -1;
+  return fd;
+}
 
 void Socket::bindAddress(const InetAddress& localaddr) {
   if (::bind(sockfd_, reinterpret_cast<const struct sockaddr*>(

@@ -3,6 +3,7 @@
 #include <sys/eventfd.h>
 #include <unistd.h>
 
+#include <condition_variable>
 #include <cstring>
 #include <errno.h>
 #include <utility>
@@ -100,6 +101,30 @@ void EventLoop::queueInLoop(Functor cb) {
   if (!isInLoopThread() || callingPendingFunctors_) {
     wakeup();
   }
+}
+
+void EventLoop::runInLoopAndWait(Functor cb) {
+  if (isInLoopThread()) {
+    cb();
+    return;
+  }
+
+  std::mutex m;
+  std::condition_variable cv;
+  bool done = false;
+  // 用 queueInLoop 而不是 runInLoop：本函数不在 loop 线程，runInLoop 也会走这条路径，
+  // 显式写出来是为了强调「一定会延后执行」，栈上的同步变量靠等待方保证生命周期
+  queueInLoop([&] {
+    cb();
+    {
+      std::lock_guard<std::mutex> lock(m);
+      done = true;
+    }
+    cv.notify_one();
+  });
+
+  std::unique_lock<std::mutex> lock(m);
+  cv.wait(lock, [&] { return done; });
 }
 
 bool EventLoop::isInLoopThread() const {
