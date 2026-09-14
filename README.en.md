@@ -229,7 +229,7 @@ graph LR
 | Weeks 3–4 | Custom RPC protocol + protobuf serialization + heartbeat keepalive | ✅ Done |
 | Weeks 5–6 | Server: protobuf reflection dispatch + service registry | ✅ Done |
 | Weeks 7–8 | Client: `RpcChannel` + connection pool + load balancing | ✅ Done |
-| Weeks 9–10 | Service discovery (ZooKeeper) + load testing + coroutine/memory-pool optimization | ⬜ Not started |
+| TBD | Service discovery (ZooKeeper) + coroutine/memory-pool optimization (unscheduled) | ⬜ Not started |
 
 ---
 
