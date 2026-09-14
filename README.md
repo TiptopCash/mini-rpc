@@ -1,5 +1,8 @@
 # mini-rpc
 
+[![CI](https://github.com/TiptopCash/mini-rpc/actions/workflows/ci.yml/badge.svg)](https://github.com/TiptopCash/mini-rpc/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+
 > 基于 epoll 的 C++17 RPC 框架：主从 Reactor + 自定义二进制协议 + protobuf 反射分发 + 客户端连接池
 
 从零实现一个可用的 RPC 框架，不依赖任何现成网络库（不含 muduo / gRPC）。

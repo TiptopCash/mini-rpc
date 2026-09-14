@@ -2,7 +2,8 @@
 # 协议层验证：编解码单元测试 + 端到端（粘包 / 半包）
 set -u
 
-ROOT="/mnt/c/Users/11816/Desktop/项目/rpc"
+# 从脚本自身位置推断仓库根目录，脚本放在任何路径下都能跑
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT=9200
 cd "$ROOT" || exit 1
 

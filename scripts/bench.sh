@@ -2,7 +2,8 @@
 # 压测：测不同线程数 / 消息大小下的吞吐与延迟
 set -u
 
-ROOT="/mnt/c/Users/11816/Desktop/项目/rpc"
+# 从脚本自身位置推断仓库根目录，脚本放在任何路径下都能跑
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT=9100
 cd "$ROOT" || exit 1
 

@@ -9,7 +9,8 @@
 # 直接证据：stall 期间采样服务端 RSS，应显著高于基线
 set -u
 
-ROOT="/mnt/c/Users/11816/Desktop/项目/rpc"
+# 从脚本自身位置推断仓库根目录，脚本放在任何路径下都能跑
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT=9100
 MB=64
 STALL_MS=5000

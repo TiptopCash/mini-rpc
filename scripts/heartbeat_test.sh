@@ -4,7 +4,8 @@
 #   场景 2：客户端忽略 ping -> 服务端应在 timeout 后强制断开
 set -u
 
-ROOT="/mnt/c/Users/11816/Desktop/项目/rpc"
+# 从脚本自身位置推断仓库根目录，脚本放在任何路径下都能跑
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT=9300
 HB=2
 TO=5

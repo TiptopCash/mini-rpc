@@ -4,7 +4,8 @@
 # 用法: bash scripts/stub_client_test.sh
 set -u
 
-ROOT="/mnt/c/Users/11816/Desktop/项目/rpc"
+# 从脚本自身位置推断仓库根目录，脚本放在任何路径下都能跑
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT=9350
 # 服务端的请求级兜底配得比客户端超时（150ms）长，才能观察到
 # 「超时后服务端的迟到响应被客户端丢弃」这条路径

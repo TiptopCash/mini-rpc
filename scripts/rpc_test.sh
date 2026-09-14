@@ -4,7 +4,8 @@
 # 用法: bash scripts/rpc_test.sh
 set -u
 
-ROOT="/mnt/c/Users/11816/Desktop/项目/rpc"
+# 从脚本自身位置推断仓库根目录，脚本放在任何路径下都能跑
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PORT=9300
 # 请求级超时兜底配短一点：NoReply 用例要等到兜底触发才算通过
 REQ_TIMEOUT_MS=300

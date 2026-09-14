@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 安装依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake g++ libprotobuf-dev protobuf-compiler
+
+      - name: 构建（Release）
+        run: |
+          cmake -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build -j"$(nproc)"
+
+      - name: 单元测试
+        run: ctest --test-dir build --output-on-failure
+
+      - name: 协议层端到端（分帧 / 粘包 / 半包）
+        run: bash scripts/proto_test.sh
+
+      - name: 心跳与空闲检测
+        run: bash scripts/heartbeat_test.sh
+
+      # 这个脚本内部会再做一次 ASan/UBSan 构建，耗时较长，
+      # 但它覆盖了反射分发、错误码、并发、优雅退出与泄漏检测，值得跑
+      - name: RPC 端到端 + ASan/UBSan/LeakSanitizer
+        run: bash scripts/rpc_test.sh
