@@ -15,6 +15,7 @@ enum RpcErrorCode : int32_t {
   kRpcBadRequest = 3,            // payload 反序列化失败 / 帧类型非法
   kRpcServiceFailed = 4,         // 服务实现调用 RpcController::SetFailed
   kRpcResponseEncodeFailed = 5,  // 响应序列化失败
+  kRpcTimeout = 6,               // 服务实现超时未回调 done->Run()，由框架兜底
 };
 
 }  // namespace mrpc

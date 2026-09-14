@@ -40,7 +40,8 @@ EventLoop::EventLoop()
       poller_(new Epoller(this)),
       wakeupFd_(createEventfd()),
       wakeupChannel_(new Channel(this, wakeupFd_)),
-      callingPendingFunctors_(false) {
+      callingPendingFunctors_(false),
+      timerQueue_(new TimerQueue(this)) {
   if (t_loopInThisThread) {
     LOG_FATAL << "Another EventLoop already exists in this thread";
   } else {
@@ -128,6 +129,18 @@ void EventLoop::removeChannel(Channel* channel) {
   assertInLoopThread();
   poller_->removeChannel(channel);
 }
+
+EventLoop::TimerId EventLoop::runAfter(int64_t delayMs,
+                                       TimerQueue::TimerCallback cb) {
+  return timerQueue_->addTimer(delayMs, std::move(cb));
+}
+
+EventLoop::TimerId EventLoop::runEvery(int64_t intervalMs,
+                                       TimerQueue::TimerCallback cb) {
+  return timerQueue_->addRepeatingTimer(intervalMs, std::move(cb));
+}
+
+void EventLoop::cancelTimer(TimerId id) { timerQueue_->cancelTimer(id); }
 
 void EventLoop::handleWakeup() {
   uint64_t one = 1;

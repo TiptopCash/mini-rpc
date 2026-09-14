@@ -33,4 +33,7 @@ message EchoResponse {
 // 服务端据此在「不知道具体消息类型」的情况下完成通用分发。
 service EchoService {
   rpc Echo(EchoRequest) returns (EchoResponse);
+  // 故意不回调 done->Run() 的坏实现，用于验证请求级超时兜底：
+  // 框架必须回 kRpcTimeout 并把这次请求占用的内存收回来，而不是泄漏。
+  rpc NoReply(EchoRequest) returns (EchoResponse);
 }

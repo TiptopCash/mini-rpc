@@ -6,10 +6,12 @@ set -u
 
 ROOT="/mnt/c/Users/11816/Desktop/项目/rpc"
 PORT=9300
+# 请求级超时兜底配短一点：NoReply 用例要等到兜底触发才算通过
+REQ_TIMEOUT_MS=300
 cd "$ROOT" || exit 1
 
 echo "########## 1. 功能 / 错误码 / 并发 ##########"
-./build/src/rpc_server $PORT 4 0 0 >/tmp/rpc_server.log 2>&1 &
+./build/src/rpc_server $PORT 4 0 0 $REQ_TIMEOUT_MS >/tmp/rpc_server.log 2>&1 &
 SRV=$!
 sleep 1
 
@@ -37,6 +39,15 @@ fi
 
 echo "--- 服务注册日志 ---"
 grep "registered" /tmp/rpc_server.log
+
+echo "--- 请求级超时兜底：NoReply 漏调 done->Run() ---"
+if grep -q "timed out in mrpc.EchoService.NoReply" /tmp/rpc_server.log; then
+  echo "兜底已触发（客户端应收到 kRpcTimeout=6）"
+  grep "timed out in" /tmp/rpc_server.log | head -3
+else
+  echo "未看到超时兜底日志，说明漏调 done->Run() 的请求没有被回收"
+  RC=1
+fi
 
 echo
 echo "--- 优雅退出：SIGTERM -> signalfd -> loop.quit() ---"
@@ -90,7 +101,7 @@ fi
 export ASAN_OPTIONS=detect_leaks=1:abort_on_error=0:log_path=/tmp/asan_rpc_report
 rm -f /tmp/asan_rpc_report.*
 
-./build-asan/src/rpc_server $PORT 4 0 0 >/tmp/rpc_asan_server.log 2>&1 &
+./build-asan/src/rpc_server $PORT 4 0 0 $REQ_TIMEOUT_MS >/tmp/rpc_asan_server.log 2>&1 &
 SRV=$!
 sleep 1
 

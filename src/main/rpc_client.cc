@@ -179,6 +179,9 @@ int main(int argc, char* argv[]) {
          kRpcBadRequest},
         {"业务失败", "mrpc.EchoService", "Echo", emptyTextPayload,
          kRpcServiceFailed},
+        // NoReply 故意不回调 done->Run()，只能靠请求级超时兜底；
+        // 用例耗时取决于服务端 -DrequestTimeoutMs（见 scripts/rpc_test.sh）
+        {"漏调 done", "mrpc.EchoService", "NoReply", validPayload, kRpcTimeout},
     };
 
     uint64_t seq = static_cast<uint64_t>(count);

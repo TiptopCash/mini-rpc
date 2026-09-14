@@ -18,6 +18,7 @@ add_library(mrpc_net STATIC
   net/TcpConnection.cc
   net/TcpServer.cc
   net/PeriodicTimer.cc
+  net/TimerQueue.cc
   net/SignalWatcher.cc
 )
 target_include_directories(mrpc_net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
@@ -71,3 +72,7 @@ target_link_libraries(rpc_client PRIVATE mrpc_proto)
 add_executable(codec_test test/codec_test.cc)
 target_link_libraries(codec_test PRIVATE mrpc_proto)
 add_test(NAME codec_test COMMAND codec_test)
+
+add_executable(timer_queue_test test/timer_queue_test.cc)
+target_link_libraries(timer_queue_test PRIVATE mrpc_net)
+add_test(NAME timer_queue_test COMMAND timer_queue_test)

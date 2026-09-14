@@ -1,7 +1,7 @@
 // RPC 服务端示例：注册 EchoServiceImpl，请求经 protobuf 反射分发到具体方法。
 //
-// 用法: ./rpc_server [port] [threads] [heartbeatSec] [timeoutSec]
-//   heartbeatSec <= 0 关闭心跳
+// 用法: ./rpc_server [port] [threads] [heartbeatSec] [timeoutSec] [requestTimeoutMs]
+//   heartbeatSec <= 0 关闭心跳；requestTimeoutMs <= 0 关闭请求级超时兜底
 #include <csignal>
 #include <cstdlib>
 #include <string>
@@ -30,6 +30,13 @@ class EchoServiceImpl : public EchoService {
     response->set_text("echo:" + request->text());
     done->Run();
   }
+
+  // 反面示例：永远不调用 done->Run()。
+  // 用来验证请求级超时兜底——框架会在超时后回 kRpcTimeout 并回收资源，
+  // 否则 request/response/controller/MethodDone 会一起泄漏，客户端永远等下去。
+  void NoReply(google::protobuf::RpcController* /*controller*/,
+               const EchoRequest* /*request*/, EchoResponse* /*response*/,
+               google::protobuf::Closure* /*done*/) override {}
 };
 
 int main(int argc, char* argv[]) {
@@ -37,6 +44,7 @@ int main(int argc, char* argv[]) {
   int threads = argc > 2 ? ::atoi(argv[2]) : 4;
   int heartbeatSec = argc > 3 ? ::atoi(argv[3]) : 10;
   int timeoutSec = argc > 4 ? ::atoi(argv[4]) : 30;
+  int64_t requestTimeoutMs = argc > 5 ? ::atoll(argv[5]) : 5000;
 
   EventLoop loop;
   InetAddress listenAddr(port);
@@ -47,6 +55,7 @@ int main(int argc, char* argv[]) {
   RpcServer server(&loop, listenAddr, "RpcServer", threads);
   server.registerService(&echoService);
   server.setHeartbeat(heartbeatSec, timeoutSec);
+  server.setRequestTimeout(requestTimeoutMs);
 
   // 优雅退出：SIGINT/SIGTERM -> loop.quit()。
   // 必须在 start() 之前构造——线程一旦创建，再屏蔽信号就晚了。
@@ -58,7 +67,7 @@ int main(int argc, char* argv[]) {
 
   server.start();
   LOG_INFO << "RpcServer listening on port " << port << " with " << threads
-           << " IO threads";
+           << " IO threads, request timeout " << requestTimeoutMs << " ms";
   loop.loop();
   LOG_INFO << "RpcServer - loop exited, cleaning up";
   return 0;

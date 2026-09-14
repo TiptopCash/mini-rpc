@@ -41,6 +41,11 @@ class RpcServer : public Noncopyable {
     timeoutSec_ = timeoutSec;
   }
 
+  // 请求级超时兜底（毫秒，<= 0 表示关闭），默认 5 秒。
+  // 服务实现若是异步的却忘记调用 done->Run()，定时器到点会回 kRpcTimeout
+  // 并回收这次请求占用的内存；否则这条路径只会在 ASan 报告里以泄漏的形式暴露。
+  void setRequestTimeout(int64_t timeoutMs) { requestTimeoutMs_ = timeoutMs; }
+
   void start();
 
  private:
@@ -56,6 +61,7 @@ class RpcServer : public Noncopyable {
   std::unique_ptr<HeartbeatMonitor> heartbeat_;
   int heartbeatSec_ = 0;
   int timeoutSec_ = 0;
+  int64_t requestTimeoutMs_ = 5000;
   bool started_ = false;
 };
 
