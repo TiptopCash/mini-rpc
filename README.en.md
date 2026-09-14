@@ -13,9 +13,6 @@ call to the peer executing it — actually work, and to verify every critical pa
 (partial writes, heartbeat timeouts, request-level timeout fallback, failover)
 with **measured data** rather than "it compiled, so it must be fine."
 
-Field notes: [7 pitfalls in a hand-written C++ RPC framework that only measurement can reveal](docs/pitfalls.md)
-(the Chinese write-up of each pitfall above — symptom / cause / fix / measured data).
-
 ---
 
 ## 1. Overview
@@ -260,7 +257,7 @@ Everything below is measured locally over WSL2 loopback; the scripts under
 | Scenario | Result |
 |---|---|
 | 200 concurrent connections × 200 messages | 0 failures, 0.18 s |
-| 64 KB × 2,000 messages | 24,748 QPS, server stayed up |
+| 64 KB × 2,000 messages | 20,875 / 21,661 QPS (two runs), server stayed up |
 | 30 abrupt disconnects (`kill -9`) | all connections reclaimed correctly, no crash |
 
 ### 5.3 EPOLLOUT partial-write path
@@ -284,10 +281,14 @@ the surplus must remain in the server's application-level outputBuffer_
 **Direct evidence (server process RSS sampling)**:
 
 ```
-baseline RSS     =  4,000 kB
-during the stall = 67,180 kB
-delta            = 63,180 kB   <- the data parked in outputBuffer_
+baseline RSS     =  3,976 kB
+during the stall = 67,160 kB
+delta            = 63,184 kB   <- the data parked in outputBuffer_
 ```
+
+RSS sampling itself jitters by a few MB (an earlier run gave 4,000 / 67,180 / 63,180 kB),
+but the delta is stable in the **63 MB** range, which matches the "kernel absorbs at most 36 MB"
+calculation.
 
 **Result**: all 64 MB was received back and verified byte-for-byte, and the server logged no errors.
 
@@ -505,24 +506,30 @@ window** instead of once per call, so the denser the calls, the wider the gap.
 
 | Client threads | Message size | QPS | P50 | P90 | P99 | P999 | Failures |
 |---:|---:|---:|---:|---:|---:|---:|---:|
-| 4 | 64 B | 119,425 | 33.1 µs | 35.2 µs | 52.3 µs | 120.3 µs | 0 |
-| **8** | **64 B** | **247,704** | **25.1 µs** | 50.0 µs | **87.4 µs** | 124.1 µs | 0 |
-| 16 | 64 B | **312,080** | 48.4 µs | 73.9 µs | 127.7 µs | 213.6 µs | 0 |
-| 8 | 1 KB | 241,490 | 25.9 µs | 51.0 µs | 86.0 µs | 125.5 µs | 0 |
-| 8 | 16 KB | 205,870 | 30.0 µs | 59.6 µs | 96.7 µs | 140.6 µs | 0 |
-| 4 | 64 KB | 79,760 | 50.2 µs | 52.5 µs | 71.6 µs | 141.4 µs | 0 |
+| 4 | 64 B | 101,398 | 37.2 µs | 43.4 µs | 100.0 µs | 191.2 µs | 0 |
+| **8** | **64 B** | **195,350** | **30.2 µs** | 69.7 µs | **115.0 µs** | 171.8 µs | 0 |
+| 16 | 64 B | **269,405** | 54.9 µs | 84.6 µs | 178.6 µs | 274.8 µs | 0 |
+| 8 | 1 KB | 186,399 | 32.1 µs | 72.8 µs | 119.4 µs | 175.4 µs | 0 |
+| 8 | 16 KB | 162,356 | 39.1 µs | 81.3 µs | 134.0 µs | 204.7 µs | 0 |
+| 4 | 64 KB | 67,247 | 56.5 µs | 64.5 µs | 144.7 µs | 262.6 µs | 0 |
 
 ### Reading the numbers
 
-- **8 threads is the knee**: doubling concurrency to 16 buys only +26% QPS (247k → 312k) while
-  P50 goes from 25 µs to 48 µs — classic diminishing returns plus queueing delay.
+- **8 threads is the knee**: doubling concurrency to 16 buys only +38% QPS (195k → 269k) while
+  P50 goes from 30 µs to 55 µs — classic diminishing returns plus queueing delay.
 - **These are a lower bound, not a ceiling**: client and server compete for the same CPU, so the
   measured value includes both sides. Throughput is higher when the server is deployed separately.
-- **At 64 KB, P50 ≈ P90 ≈ 50 µs**: latency is bandwidth-bound rather than CPU-bound, so the shape
+- **At 64 KB, P50 ≈ P90 ≈ 60 µs**: latency is bandwidth-bound rather than CPU-bound, so the shape
   of the curve changes as expected.
+- **Run-to-run variance is large, so quote a range**: with the same code and the same
+  configuration, "8 threads / 64 B" measured **195k** (the numbers above) and **248k** (an earlier
+  recording) at different times — roughly a 26% spread; "16 threads / 64 B" gave **269k** and
+  **312k**. In a same-machine loopback benchmark the client and server share and contend for CPU,
+  so variance of this magnitude is expected. Quote the order of magnitude, never a single peak
+  as if it were a guarantee.
 
 > ⚠️ Always quote the test setup (loopback / same machine / I/O thread count / message size)
-> alongside the numbers, otherwise they are not comparable.
+> **and the observed range** alongside the numbers, otherwise they are not comparable.
 
 ---
 
