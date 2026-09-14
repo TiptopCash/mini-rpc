@@ -2,6 +2,7 @@
 //
 // 用法: ./proto_echo_server [port] [threads] [heartbeatSec] [timeoutSec]
 //   heartbeatSec <= 0 表示关闭心跳
+#include <csignal>
 #include <cstdlib>
 #include <memory>
 
@@ -9,6 +10,7 @@
 #include "net/Buffer.h"
 #include "net/EventLoop.h"
 #include "net/InetAddress.h"
+#include "net/SignalWatcher.h"
 #include "net/TcpConnection.h"
 #include "net/TcpServer.h"
 #include "protocol/HeartbeatMonitor.h"
@@ -83,6 +85,14 @@ int main(int argc, char* argv[]) {
         &loop, &server, HeartbeatOptions{1, heartbeatSec, timeoutSec}));
   }
 
+  // 必须在 start() 之前构造——线程一旦创建，再屏蔽信号就晚了
+  SignalWatcher signals(&loop, {SIGINT, SIGTERM}, [&loop](int signo) {
+    LOG_INFO << "ProtoEchoServer - signal " << signo
+             << " received, shutting down";
+    loop.quit();
+  });
+  signals.start();
+
   server.start();
   if (heartbeat) {
     heartbeat->start();
@@ -93,5 +103,6 @@ int main(int argc, char* argv[]) {
   LOG_INFO << "ProtoEchoServer listening on port " << port << " with " << threads
            << " IO threads";
   loop.loop();
+  LOG_INFO << "ProtoEchoServer - loop exited, cleaning up";
   return 0;
 }

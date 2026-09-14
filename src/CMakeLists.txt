@@ -18,6 +18,7 @@ add_library(mrpc_net STATIC
   net/TcpConnection.cc
   net/TcpServer.cc
   net/PeriodicTimer.cc
+  net/SignalWatcher.cc
 )
 target_include_directories(mrpc_net PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 target_link_libraries(mrpc_net PUBLIC Threads::Threads)

@@ -2,12 +2,14 @@
 //
 // 用法: ./rpc_server [port] [threads] [heartbeatSec] [timeoutSec]
 //   heartbeatSec <= 0 关闭心跳
+#include <csignal>
 #include <cstdlib>
 #include <string>
 
 #include "common/Logger.h"
 #include "net/EventLoop.h"
 #include "net/InetAddress.h"
+#include "net/SignalWatcher.h"
 #include "protocol/RpcServer.h"
 #include "rpc.pb.h"
 
@@ -38,15 +40,26 @@ int main(int argc, char* argv[]) {
 
   EventLoop loop;
   InetAddress listenAddr(port);
-  RpcServer server(&loop, listenAddr, "RpcServer", threads);
 
-  EchoServiceImpl echoService;  // 必须比 server 活得久（注册表不持有所有权）
+  // 先于 server 声明 -> 后于 server 销毁。
+  // 注册表不持有所有权，若先销毁服务对象，server 析构期间就会持有悬垂指针
+  EchoServiceImpl echoService;
+  RpcServer server(&loop, listenAddr, "RpcServer", threads);
   server.registerService(&echoService);
   server.setHeartbeat(heartbeatSec, timeoutSec);
+
+  // 优雅退出：SIGINT/SIGTERM -> loop.quit()。
+  // 必须在 start() 之前构造——线程一旦创建，再屏蔽信号就晚了。
+  SignalWatcher signals(&loop, {SIGINT, SIGTERM}, [&loop](int signo) {
+    LOG_INFO << "RpcServer - signal " << signo << " received, shutting down";
+    loop.quit();
+  });
+  signals.start();
 
   server.start();
   LOG_INFO << "RpcServer listening on port " << port << " with " << threads
            << " IO threads";
   loop.loop();
+  LOG_INFO << "RpcServer - loop exited, cleaning up";
   return 0;
 }
