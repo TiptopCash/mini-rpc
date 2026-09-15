@@ -5,11 +5,30 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <csignal>
 #include <cstring>
 #include <errno.h>
 
 #include "common/Logger.h"
 #include "net/InetAddress.h"
+
+namespace {
+
+// 忽略 SIGPIPE。
+//
+// 对端发 RST（或半关闭）之后，排在本端发送缓冲里的数据仍会被内核尝试写出去，
+// 此时 ::write 返回 EPIPE，同时内核递送 SIGPIPE —— 而 SIGPIPE 的默认动作是
+// 终止进程。后果是一个客户端的异常断连就能打死整个服务端，且因为进程被信号
+// 直接终结，连一行错误日志都不会留下（实测：27 次 RST 断连即复现，退出码 141）。
+//
+// 置为 SIG_IGN 之后 ::write 只是返回 -1/EPIPE，由 TcpConnection::sendInLoop
+// 记录日志并走正常的错误路径。muduo 同样在 Socket.cc 里做这件事。
+struct IgnoreSigPipe {
+  IgnoreSigPipe() { ::signal(SIGPIPE, SIG_IGN); }
+};
+IgnoreSigPipe g_ignoreSigPipe;
+
+}  // namespace
 
 namespace mrpc {
 
