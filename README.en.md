@@ -96,7 +96,7 @@ graph TB
         C5["TimerQueue / PeriodicTimer / SignalWatcher"]
     end
     subgraph L4["common"]
-        D1["Logging / Timestamp / Noncopyable"]
+        D1["Logger / Timestamp / Noncopyable"]
     end
     L1 --> L2 --> L3 --> L4
 ```
@@ -179,7 +179,7 @@ graph LR
 | Multiplexing | `Epoller` | epoll wrapper; stores `Channel*` directly in `data.ptr` for O(1) lookup; grows the event array automatically when it fills up |
 | Event channel | `Channel` | Event mask + callback dispatch; `tie()` holds a `weak_ptr` so the owner stays alive during its own callback |
 | Listening | `Acceptor` | Non-blocking `accept4`, `SO_REUSEPORT` |
-| Non-blocking connect | `Connector` | `EINPROGRESS` → `EPOLLOUT` → `getsockopt(SO_ERROR)` for the real result; exponential backoff retry (200 ms initial, 5 s cap); fd ownership transferred via `Socket::release()` |
+| Non-blocking connect | `Connector` | `EINPROGRESS` → `EPOLLOUT` → `getsockopt(SO_ERROR)` for the real result; exponential backoff retry (**defaults to 500 ms initial / 30 s cap**, overridden to 200 ms / 5 s by `RpcChannel` in the RPC client); fd ownership transferred via `Socket::release()` |
 | Connection | `TcpConnection` | `shared_ptr` lifetime; output buffer + `EPOLLOUT` for partial writes; half-close handling |
 | Server | `TcpServer` | Connection table; **deferred destruction** (`queueInLoop(connectDestroyed)`, so it never destroys itself on its own member-function stack) |
 | Client | `TcpClient` | Composes Connector + TcpConnection; auto-reconnect on disconnect |
@@ -522,11 +522,13 @@ window** instead of once per call, so the denser the calls, the wider the gap.
 - **At 64 KB, P50 ≈ P90 ≈ 60 µs**: latency is bandwidth-bound rather than CPU-bound, so the shape
   of the curve changes as expected.
 - **Run-to-run variance is large, so quote a range**: with the same code and the same
-  configuration, three runs of "8 threads / 64 B" gave **195k** (the numbers above), **220k**
-  (a rerun) and **248k** (an earlier recording) — a ~27% spread between highest and lowest;
-  "16 threads / 64 B" gave **269k** / **276k** / **312k**. In a same-machine loopback benchmark
-  the client and server share and contend for CPU, so variance of this magnitude is expected.
-  Quote the order of magnitude, never a single peak as if it were a guarantee.
+  configuration, three runs of "8 threads / 64 B" gave **195k** (the 2026-09-14 rerun, i.e. the
+  table above), **220k** (a third run the same day) and **248k** (an earlier recording) —
+  i.e. **roughly 195k–248k**, a ~27% spread between highest and lowest;
+  "16 threads / 64 B" gave **269k** / **276k** / **312k**, i.e. **roughly 269k–312k**.
+  In a same-machine loopback benchmark the client and server share and contend for CPU, so
+  variance of this magnitude is expected.
+  Quote a **range**, never a single peak as if it were a guarantee.
 
 > ⚠️ Always quote the test setup (loopback / same machine / I/O thread count / message size)
 > **and the observed range** alongside the numbers, otherwise they are not comparable.

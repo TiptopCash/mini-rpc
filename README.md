@@ -94,7 +94,7 @@ graph TB
         C5["TimerQueue / PeriodicTimer / SignalWatcher"]
     end
     subgraph L4["common"]
-        D1["Logging / Timestamp / Noncopyable"]
+        D1["Logger / Timestamp / Noncopyable"]
     end
     L1 --> L2 --> L3 --> L4
 ```
@@ -175,7 +175,7 @@ graph LR
 | 多路复用 | `Epoller` | epoll 封装，`data.ptr` 直接存 `Channel*` 做 O(1) 定位；返回事件数打满数组时自动扩容 |
 | 事件通道 | `Channel` | 事件掩码 + 回调分发；`tie()` 用 `weak_ptr` 保证回调期间对象存活 |
 | 监听 | `Acceptor` | 非阻塞 `accept4`，`SO_REUSEPORT` |
-| 非阻塞连接 | `Connector` | `EINPROGRESS` → `EPOLLOUT` → `getsockopt(SO_ERROR)` 判定真实结果；指数退避重试（200ms 起，上限 5s）；fd 所有权经 `Socket::release()` 移交 |
+| 非阻塞连接 | `Connector` | `EINPROGRESS` → `EPOLLOUT` → `getsockopt(SO_ERROR)` 判定真实结果；指数退避重试（**默认 500ms 起 / 上限 30s**，RPC 客户端由 `RpcChannel` 覆盖为 200ms 起 / 上限 5s）；fd 所有权经 `Socket::release()` 移交 |
 | 连接管理 | `TcpConnection` | `shared_ptr` 生命周期；输出缓冲 + `EPOLLOUT` 处理部分写；半关闭处理 |
 | 服务端 | `TcpServer` | 连接表管理；**延迟销毁**（`queueInLoop(connectDestroyed)`，避免在成员函数栈上析构自己） |
 | 客户端 | `TcpClient` | 组合 Connector + TcpConnection；断线自动重连 |
@@ -504,11 +504,12 @@ LeakSanitizer 报告为空                       <- 此前必漏的对象已被�
   「客户端 + 服务端」合计消耗。服务端独立部署时吞吐更高。
 - **64 KB 时 P50≈P90≈60 µs**：延迟由带宽而非 CPU 主导，曲线形态变化符合预期。
 - **跨次运行波动很大，引用时要给区间**：同一份代码、同一配置，
-  「8 线程 / 64B」在不同时间点三次重测得到 **19.5 万**（本文数据）、**22.0 万**（复测）
-  与 **24.8 万**（早前记录），最高与最低相差约 27%；
-  「16 线程 / 64B」为 **26.9 万** / **27.6 万** / **31.2 万**。
+  「8 线程 / 64B」在不同时间点三次重测得到 **19.5 万**（2026-09-14 复测，即上表）、
+  **22.0 万**（同日第三次重测）与 **24.8 万**（早前记录），即 **约 19.5–24.8 万**，
+  最高与最低相差约 27%；
+  「16 线程 / 64B」为 **26.9 万** / **27.6 万** / **31.2 万**，即 **约 26.9–31.2 万**。
   同机 loopback 压测里客户端和服务端共享 CPU、互相争抢，
-  这个量级的抖动是正常的，所以只能按「量级」引用，不能把单次峰值当承诺值。
+  这个量级的抖动是正常的，所以只能按**区间**引用，不能把单次峰值当承诺值。
 
 > ⚠️ 引用数据务必注明测试方式（Loopback / 同机 / IO 线程数 / 消息大小）**和取值范围**，
 > 否则没有可比性。
