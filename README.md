@@ -21,7 +21,7 @@
 | 语言标准 | C++17 |
 | 构建 | CMake 3.16+，默认 Release |
 | 第三方依赖 | protobuf 3.21.12（序列化 + 反射分发）、pthread；**无网络库依赖** |
-| 开发环境 | Windows 11 + WSL2 (Ubuntu)，g++ 15.2 / cmake 3.28.3 |
+| 开发环境 | Windows 11 + WSL2 (Ubuntu 24.04)，g++ 13.3.0 / cmake 3.28.3 |
 | 代码规模 | **65 个源文件，约 5850 行 C++**（不含 protobuf 生成代码与测试） |
 | 网络模型 | epoll + **主从 Reactor**，one loop per thread，多 IO 线程 |
 | 协议 | 8 字节固定头（magic / version / type / bodyLen）+ protobuf body |

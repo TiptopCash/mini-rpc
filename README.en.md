@@ -22,7 +22,7 @@ with **measured data** rather than "it compiled, so it must be fine."
 | Language standard | C++17 |
 | Build | CMake 3.16+, Release by default |
 | Dependencies | protobuf 3.21.12 (serialization + reflection dispatch), pthread; **no networking library** |
-| Dev environment | Windows 11 + WSL2 (Ubuntu), g++ 15.2 / cmake 3.28.3 |
+| Dev environment | Windows 11 + WSL2 (Ubuntu 24.04), g++ 13.3.0 / cmake 3.28.3 |
 | Code size | **65 source files, ~5,850 lines of C++** (excluding protobuf-generated code and tests) |
 | Network model | epoll + **master-slave Reactor**, one loop per thread, multiple I/O threads |
 | Protocol | 8-byte fixed header (magic / version / type / bodyLen) + protobuf body |
