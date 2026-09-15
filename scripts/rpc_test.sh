@@ -107,13 +107,19 @@ SRV=$!
 sleep 1
 
 ./build-asan/src/rpc_client 127.0.0.1 $PORT 500 4
-RC=$?
+RC2=$?
 
 kill -TERM $SRV
 wait $SRV 2>/dev/null
 SRV_RC=$?
 if [ "$SRV_RC" -ne 0 ]; then
   echo "ASan 服务端非正常退出（exit=$SRV_RC）"
+  RC2=1
+fi
+
+# 第 1 节各检查累积在 RC 里，这里只把第 2 节的结果并进去，不能直接覆盖 ——
+# 用 RC=$? 的话，只要 ASan 客户端正常退出，第 1 节全部失败也会被抹掉，CI 照样绿。
+if [ "$RC2" -ne 0 ]; then
   RC=1
 fi
 

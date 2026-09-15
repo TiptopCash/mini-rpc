@@ -24,12 +24,34 @@ rm -f /tmp/hb_srv.log
 SRV=$!
 sleep 1
 
+# RC 累积本轮所有检查的失败。脚本必须以 exit $RC 收尾 ——
+# 否则最后一条 echo 会让退出码恒为 0，这条 CI 步骤永远不会失败。
+RC=0
+
 echo "=== 场景 1: 客户端回复 ack（心跳 ${HB}s / 超时 ${TO}s，运行 ${DURATION}s）==="
-./build/src/idle_client 127.0.0.1 $PORT 1 $DURATION
+OUT1=$(./build/src/idle_client 127.0.0.1 $PORT 1 $DURATION)
+echo "$OUT1"
+if echo "$OUT1" | grep -q "收到 ping: 0 次"; then
+  echo "场景 1 失败：一次 ping 都没收到，心跳根本没发出去"
+  RC=1
+fi
+if echo "$OUT1" | grep -q "仍然存活"; then
+  echo "场景 1 通过：按时回 ack 的连接未被断开"
+else
+  echo "场景 1 失败：回了 ack 的连接不应被断开"
+  RC=1
+fi
 
 echo
 echo "=== 场景 2: 客户端忽略 ping（应约 ${TO}s 后被断开）==="
-./build/src/idle_client 127.0.0.1 $PORT 0 $DURATION
+OUT2=$(./build/src/idle_client 127.0.0.1 $PORT 0 $DURATION)
+echo "$OUT2"
+if echo "$OUT2" | grep -q "已被服务端断开"; then
+  echo "场景 2 通过：忽略 ping 的连接被服务端强制断开"
+else
+  echo "场景 2 失败：忽略 ping 的连接应在 ${TO}s 超时后被断开"
+  RC=1
+fi
 
 echo
 echo "=== 服务端心跳 / 断开日志 ==="
@@ -41,9 +63,22 @@ if kill -0 $SRV 2>/dev/null; then
   echo "存活，未崩溃"
 else
   echo "已崩溃"
+  RC=1
+fi
+
+if grep -q "force close" /tmp/hb_srv.log; then
+  echo "服务端日志确认执行了 force close"
+else
+  echo "服务端日志缺少 force close"
+  RC=1
 fi
 
 kill $SRV 2>/dev/null
 
 echo
-echo "########## 完成 ##########"
+if [ "$RC" -eq 0 ]; then
+  echo "########## 完成：全部通过 ##########"
+else
+  echo "########## 完成：存在失败 ##########"
+fi
+exit $RC
