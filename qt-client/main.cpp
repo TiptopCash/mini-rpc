@@ -6,9 +6,54 @@
 #include "MainWindow.h"
 #include "RpcClient.h"
 
+#ifdef _WIN32
+#include <windows.h>
+
+#include <cstdio>
+#endif
+
+namespace {
+
+// Windows 下 exe 是 GUI 子系统，双击不会再带终端窗口。
+// --selftest / --idle-test / --screenshot 这些命令行模式需要输出：
+// 有父控制台就接上去，没有就新建一个；stdout/stderr 已被重定向时保持不动。
+void ensureConsoleForCli() {
+#ifdef _WIN32
+  // GUI 子系统的进程没有控制台时，Qt 默认把 qInfo/qCritical 发给调试器而不是
+  // stderr——即使 stdout/stderr 已经被重定向到文件或管道也收不到。
+  // 命令行模式强制按 stderr 输出。
+  qputenv("QT_ASSUME_STDERR_HAS_CONSOLE", "1");
+
+  // 已经被父进程重定向到文件/管道时，保持原样，不额外开控制台。
+  const auto isRedirected = [](HANDLE h) {
+    if (h == nullptr || h == INVALID_HANDLE_VALUE) {
+      return false;
+    }
+    const DWORD type = GetFileType(h);
+    return type == FILE_TYPE_DISK || type == FILE_TYPE_PIPE;
+  };
+
+  if (isRedirected(GetStdHandle(STD_OUTPUT_HANDLE)) ||
+      isRedirected(GetStdHandle(STD_ERROR_HANDLE))) {
+    return;
+  }
+
+  if (GetConsoleWindow() == nullptr) {
+    if (!AttachConsole(ATTACH_PARENT_PROCESS)) {
+      AllocConsole();
+    }
+  }
+  (void)std::freopen("CONOUT$", "w", stdout);
+  (void)std::freopen("CONOUT$", "w", stderr);
+#endif
+}
+
+}  // namespace
+
 // 无界面自检：连接、发一次 Echo、打印响应、退出。
 // 用法：./mini_rpc_qt_client --selftest [host] [port] [text]
 static int runSelfTest(int argc, char** argv) {
+  ensureConsoleForCli();
   QCoreApplication app(argc, argv);
 
   const QString host =
@@ -61,6 +106,7 @@ static int runSelfTest(int argc, char** argv) {
 // 再发一次 Echo。能成功说明客户端正确回了心跳 ack，而不是靠服务端关心跳。
 // 用法：./mini_rpc_qt_client --idle-test [host] [port] [seconds]
 static int runIdleTest(int argc, char** argv) {
+  ensureConsoleForCli();
   QCoreApplication app(argc, argv);
 
   const QString host =
@@ -115,6 +161,7 @@ int main(int argc, char** argv) {
   // 用法：QT_QPA_PLATFORM=offscreen ./mini_rpc_qt_client --screenshot /tmp/qt-client.png
   if (argc > 1 &&
       QString::fromLocal8Bit(argv[1]) == QStringLiteral("--screenshot")) {
+    ensureConsoleForCli();
     QApplication app(argc, argv);
     MainWindow window;
     window.show();

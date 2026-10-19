@@ -54,3 +54,10 @@ target_link_libraries(mini_rpc_qt_client PRIVATE
   protobuf::libprotobuf
   Threads::Threads
 )
+
+# Windows 下不加这个属性时链接出来的是控制台子系统（Subsystem: Windows CUI），
+# 双击 exe 会额外弹一个终端窗口。显式改成 GUI 子系统；
+# --selftest / --idle-test 需要的控制台输出由 main.cpp 里的 AttachConsole 接回。
+if(WIN32)
+  set_target_properties(mini_rpc_qt_client PROPERTIES WIN32_EXECUTABLE TRUE)
+endif()

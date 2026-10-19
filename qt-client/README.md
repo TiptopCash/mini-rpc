@@ -109,6 +109,11 @@ done
 
 `dist/mini_rpc_qt_client.exe` 可以脱离 MSYS2 终端直接双击运行。
 
+Windows 下这个 exe 是 GUI 子系统（`Subsystem: Windows GUI`），双击只打开窗口，
+不会再附带一个终端。`--selftest` / `--idle-test` / `--screenshot` 这类命令行模式
+会自动接上父控制台（没有父控制台时新建一个）来打印结果；如果 stdout/stderr 已经被
+重定向，则保持重定向，不额外开窗口。
+
 ## 无界面自检
 
 ```bash
