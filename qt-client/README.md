@@ -54,6 +54,13 @@ cmake --build build -j
 Windows 上用 WSLg 运行时会直接弹出窗口；如果配置了 Windows 版 Qt 和 protobuf，
 同一份 CMake 工程也可以在 Windows 原生构建。
 
+WSLg 下可能看到 `libEGL warning` / `MESA: error: ZINK` 之类的输出，这是 WSLg
+探测 GPU 失败后回退软件渲染，不影响窗口和功能。要消掉这些行：
+
+```bash
+LIBGL_ALWAYS_SOFTWARE=1 ./build/mini_rpc_qt_client
+```
+
 ## 无界面自检
 
 ```bash
