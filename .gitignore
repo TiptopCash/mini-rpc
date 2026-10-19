@@ -2,6 +2,7 @@
 build/
 build-asan/
 build-*/
+qt-client/dist/
 
 # CMake
 CMakeCache.txt

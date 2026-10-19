@@ -35,7 +35,11 @@ LogMessage::~LogMessage() {
   gettimeofday(&tv, nullptr);
   struct tm tm_time;
   time_t sec = tv.tv_sec;
+#ifdef _WIN32
+  localtime_s(&tm_time, &sec);  // MinGW 只有 MSVC 风格的 localtime_s
+#else
   localtime_r(&sec, &tm_time);
+#endif
 
   char timebuf[64];
   snprintf(timebuf, sizeof(timebuf), "%04d-%02d-%02d %02d:%02d:%02d.%06ld ",

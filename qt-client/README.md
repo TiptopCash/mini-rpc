@@ -51,15 +51,63 @@ cmake --build build -j
 ./qt-client/build/mini_rpc_qt_client
 ```
 
-Windows 上用 WSLg 运行时会直接弹出窗口；如果配置了 Windows 版 Qt 和 protobuf，
-同一份 CMake 工程也可以在 Windows 原生构建。
-
 WSLg 下可能看到 `libEGL warning` / `MESA: error: ZINK` 之类的输出，这是 WSLg
 探测 GPU 失败后回退软件渲染，不影响窗口和功能。要消掉这些行：
 
 ```bash
 LIBGL_ALWAYS_SOFTWARE=1 ./build/mini_rpc_qt_client
 ```
+
+如果 WSLg 以 `COPY MODE` 运行、窗口在桌面上看不到（进程和 X 窗口都在，只是不显示），
+直接用下面的 Windows 原生构建，客户端通过 `127.0.0.1` 连 WSL 里的服务端即可。
+
+## Windows 原生构建（MSYS2 / MinGW）
+
+在 [MSYS2](https://www.msys2.org/) 的 MINGW64 终端里装依赖：
+
+```bash
+pacman -S --needed mingw-w64-x86_64-gcc mingw-w64-x86_64-cmake \
+  mingw-w64-x86_64-ninja mingw-w64-x86_64-qt6-base mingw-w64-x86_64-protobuf
+```
+
+CMake 生成 protoc 命令时经过 `cmd.exe`，项目路径里不能有中文（会被按 GBK 解释成
+不存在的目录）。路径不满足时，先建一个纯 ASCII 的目录联接再构建：
+
+```bat
+mklink /J C:\Users\<你>\mrpc <项目真实路径>
+```
+
+然后构建、自检：
+
+```bash
+cd /c/Users/<你>/mrpc
+cmake -S qt-client -B qt-client/build-win -G Ninja -DCMAKE_BUILD_TYPE=Release
+cmake --build qt-client/build-win -j
+
+./qt-client/build-win/mini_rpc_qt_client.exe --selftest 127.0.0.1 9300 win
+```
+
+打包成可双击运行的分发包（Qt 插件 + 全部 MinGW 运行时 DLL）：
+
+```bash
+cd qt-client
+rm -rf dist && mkdir dist
+cp build-win/mini_rpc_qt_client.exe dist/
+windeployqt --release --compiler-runtime --no-translations dist/mini_rpc_qt_client.exe
+
+# objdump 扫依赖闭包，把 /mingw64/bin 里的非系统 DLL 拷进 dist；
+# 多扫几轮，直到新拷进来的 DLL 的依赖也被带进来
+for i in 1 2 3 4 5; do
+  find dist \( -name '*.exe' -o -name '*.dll' \) -print0 |
+    xargs -0 -n1 objdump -p 2>/dev/null |
+    awk '/DLL Name:/ {print $3}' | sort -u |
+    while read -r d; do
+      [ -f "dist/$d" ] || cp "/mingw64/bin/$d" dist/ 2>/dev/null || true
+    done
+done
+```
+
+`dist/mini_rpc_qt_client.exe` 可以脱离 MSYS2 终端直接双击运行。
 
 ## 无界面自检
 

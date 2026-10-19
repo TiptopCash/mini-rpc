@@ -13,7 +13,14 @@ endif()
 add_compile_options(-Wall -Wextra -Wno-unused-parameter)
 
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
-find_package(Protobuf REQUIRED)
+# 优先用 protobuf 自带的 config 包：新版 protobuf（MSYS2 的 7.x）把 Abseil
+# 依赖挂在 imported target 上，CMake 自带的 FindProtobuf 不会传递这些依赖。
+# 老版本没有 config 包时退回 FindProtobuf，两个目标名都叫 protobuf::libprotobuf。
+set(protobuf_MODULE_COMPATIBLE ON CACHE BOOL "" FORCE)
+find_package(protobuf CONFIG QUIET)
+if(NOT protobuf_FOUND)
+  find_package(Protobuf REQUIRED)
+endif()
 find_package(Threads REQUIRED)
 
 set(REPO_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/..")
